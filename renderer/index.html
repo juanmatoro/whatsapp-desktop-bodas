@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WhatsApp Desktop - Bodas</title>
+  </head>
+  <body>
+    <h2>Estado de sesión</h2>
+    <div id="estado">Cargando...</div>
+
+    <h2>QR de WhatsApp</h2>
+    <img id="qr" src="" width="300" />
+
+    <h2>Log de eventos</h2>
+    <pre id="log"></pre>
+
+    <script>
+      window.electronAPI.onQR((qr) => {
+        document.getElementById("qr").src = qr;
+      });
+
+      window.electronAPI.onLog((msg) => {
+        document.getElementById("log").textContent += msg + "\n";
+      });
+
+      window.electronAPI.obtenerEstado().then((estado) => {
+        document.getElementById("estado").textContent = estado;
+      });
+    </script>
+  </body>
+</html>
