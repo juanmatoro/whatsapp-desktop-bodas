@@ -1,4 +1,4 @@
-/* const venom = require("venom-bot");
+const venom = require("venom-bot");
 
 let client;
 let estado = "No iniciado";
@@ -6,23 +6,57 @@ let callbackQR;
 let callbackLog;
 
 function iniciarWhatsApp() {
+  logMensaje("🚀 Iniciando sesión de WhatsApp...");
+
   venom
     .create({
       session: "bodas",
       multidevice: true,
-      headless: true,
+      headless: false,
+      folderNameToken: "session",
+      catchQR: (qrBase64) => {
+        logMensaje("🔑 QR recibido");
+        if (callbackQR) callbackQR(qrBase64);
+      },
+      statusFind: (status) => {
+        logMensaje(`📡 Estado detectado: ${status}`);
+        estado = status;
+      },
     })
     .then((cl) => {
       client = cl;
       estado = "Conectado";
-      callbackLog?.("✅ Sesión conectada");
+      logMensaje("✅ Sesión iniciada correctamente");
 
-      // Aquí puedes añadir polling al backend
+      // Opcional: enviar mensaje de prueba
+      const telefonoDestino = "34676983429@c.us"; // ← número con prefijo internacional
+      const mensaje =
+        "¡Hola! Este es un mensaje de prueba desde la app de escritorio 🎉";
+
+      client
+        .sendText(telefonoDestino, mensaje)
+        .then(() => {
+          logMensaje("📨 Mensaje de prueba enviado correctamente");
+        })
+        .catch((err) => {
+          logMensaje("❌ Error al enviar el mensaje de prueba: " + err.message);
+        });
+
+      // Escuchar cambios de estado (por ejemplo: CONNECTING, TIMEOUT, etc.)
+      client.onStateChange((nuevoEstado) => {
+        estado = nuevoEstado;
+        logMensaje(`📡 Estado: ${nuevoEstado}`);
+      });
     })
     .catch((err) => {
       estado = "Error";
-      callbackLog?.("❌ Error al iniciar sesión: " + err.message);
+      logMensaje("❌ Error al iniciar sesión: " + err.message);
     });
+}
+
+function logMensaje(msg) {
+  console.log(msg); // Mantener consola
+  if (callbackLog) callbackLog(msg); // Enviar al frontend
 }
 
 function estadoSesion() {
@@ -35,64 +69,6 @@ function onQRCode(callback) {
 
 function onMensaje(callback) {
   callbackLog = callback;
-}
-
-module.exports = {
-  iniciarWhatsApp,
-  estadoSesion,
-  onQRCode,
-  onMensaje,
-};
- */
-
-const venom = require("venom-bot");
-
-let client;
-let estado = "No iniciado";
-
-function iniciarWhatsApp() {
-  venom
-    .create({
-      session: "bodas",
-      multidevice: true,
-      headless: false,
-      folderNameToken: "session",
-    })
-    .then((cl) => {
-      client = cl;
-      estado = "Conectado";
-      console.log("✅ Sesión iniciada");
-
-      // Aquí puedes cambiar por tu número o el de prueba
-      const telefonoDestino = "34676983429@c.us"; // número con prefijo país y sin +
-      const mensaje =
-        "¡Hola! Este es un mensaje de prueba desde la app de escritorio 🎉";
-
-      client
-        .sendText(telefonoDestino, mensaje)
-        .then(() => {
-          console.log("✅ Mensaje enviado correctamente");
-        })
-        .catch((err) => {
-          console.error("❌ Error al enviar el mensaje:", err.message);
-        });
-    })
-    .catch((err) => {
-      estado = "Error";
-      console.error("❌ Error al iniciar sesión:", err.message);
-    });
-}
-
-function estadoSesion() {
-  return estado;
-}
-
-function onQRCode(callback) {
-  // Aquí podrías emitir el QR si lo necesitas
-}
-
-function onMensaje(callback) {
-  // Aquí podrías emitir mensajes al frontend si lo necesitas
 }
 
 module.exports = {
