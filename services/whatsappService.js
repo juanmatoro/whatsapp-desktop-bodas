@@ -1,4 +1,6 @@
-/* const venom = require("venom-bot");
+const venom = require("venom-bot");
+const fs = require("fs");
+const path = require("path");
 
 let client;
 let estado = "No iniciado";
@@ -6,23 +8,70 @@ let callbackQR;
 let callbackLog;
 
 function iniciarWhatsApp() {
+  log("🔄 Iniciando sesión de WhatsApp...");
+  estado = "Iniciando";
+
   venom
     .create({
       session: "bodas",
       multidevice: true,
-      headless: true,
+      headless: false,
+      folderNameToken: "session",
+      catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
+        estado = "QR requerido";
+        log("📸 Mostrando QR para conexión...");
+        if (callbackQR) callbackQR(base64Qr);
+      },
     })
     .then((cl) => {
       client = cl;
       estado = "Conectado";
-      callbackLog?.("✅ Sesión conectada");
+      log("✅ Sesión conectada");
 
-      // Aquí puedes añadir polling al backend
+      client.onStateChange((state) => {
+        log(`📶 Estado de conexión: ${state}`);
+        if (
+          state === "DISCONNECTED" ||
+          state === "UNPAIRED" ||
+          state === "UNPAIRED_IDLE"
+        ) {
+          log("⚠️ Sesión desconectada. Reiniciando...");
+          estado = "Desconectado";
+          reiniciarSesion();
+        }
+      });
     })
     .catch((err) => {
+      log("❌ Error al iniciar sesión: " + err.message);
+
+      // 🔄 Si es error de Puppeteer/Venom, borramos sesión y reintentamos
+      if (
+        err.message === undefined ||
+        err.message.includes("Failed to launch the browser")
+      ) {
+        log("🧹 Posible sesión bloqueada. Borrando carpeta y reintentando...");
+        eliminarSesionLocal();
+        setTimeout(() => iniciarWhatsApp(), 2000);
+      }
+
       estado = "Error";
-      callbackLog?.("❌ Error al iniciar sesión: " + err.message);
     });
+}
+
+function reiniciarSesion() {
+  setTimeout(() => {
+    iniciarWhatsApp();
+  }, 3000);
+}
+
+function eliminarSesionLocal() {
+  const sessionPath = path.join(__dirname, "../session/bodas");
+  if (fs.existsSync(sessionPath)) {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+    log("🧹 Datos de sesión eliminados correctamente.");
+  } else {
+    log("ℹ️ No se encontraron datos de sesión anteriores.");
+  }
 }
 
 function estadoSesion() {
@@ -37,62 +86,9 @@ function onMensaje(callback) {
   callbackLog = callback;
 }
 
-module.exports = {
-  iniciarWhatsApp,
-  estadoSesion,
-  onQRCode,
-  onMensaje,
-};
- */
-
-const venom = require("venom-bot");
-
-let client;
-let estado = "No iniciado";
-
-function iniciarWhatsApp() {
-  venom
-    .create({
-      session: "bodas",
-      multidevice: true,
-      headless: false,
-      folderNameToken: "session",
-    })
-    .then((cl) => {
-      client = cl;
-      estado = "Conectado";
-      console.log("✅ Sesión iniciada");
-
-      // Aquí puedes cambiar por tu número o el de prueba
-      const telefonoDestino = "34676983429@c.us"; // número con prefijo país y sin +
-      const mensaje =
-        "¡Hola! Este es un mensaje de prueba desde la app de escritorio 🎉";
-
-      client
-        .sendText(telefonoDestino, mensaje)
-        .then(() => {
-          console.log("✅ Mensaje enviado correctamente");
-        })
-        .catch((err) => {
-          console.error("❌ Error al enviar el mensaje:", err.message);
-        });
-    })
-    .catch((err) => {
-      estado = "Error";
-      console.error("❌ Error al iniciar sesión:", err.message);
-    });
-}
-
-function estadoSesion() {
-  return estado;
-}
-
-function onQRCode(callback) {
-  // Aquí podrías emitir el QR si lo necesitas
-}
-
-function onMensaje(callback) {
-  // Aquí podrías emitir mensajes al frontend si lo necesitas
+function log(mensaje) {
+  console.log(mensaje);
+  if (callbackLog) callbackLog(mensaje);
 }
 
 module.exports = {
