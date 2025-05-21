@@ -1,15 +1,15 @@
 const venom = require("venom-bot");
-const fs = require("fs");
-const path = require("path");
 
 let client;
 let estado = "No iniciado";
 let callbackQR;
 let callbackLog;
+let mainWindow;
 
-function iniciarWhatsApp() {
-  log("🔄 Iniciando sesión de WhatsApp...");
-  estado = "Iniciando";
+function iniciarWhatsApp(windowRef) {
+  mainWindow = windowRef;
+  estado = "Iniciando...";
+  logEstado("🔄 Iniciando sesión de WhatsApp...");
 
   venom
     .create({
@@ -17,61 +17,37 @@ function iniciarWhatsApp() {
       multidevice: true,
       headless: false,
       folderNameToken: "session",
-      catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
-        estado = "QR requerido";
-        log("📸 Mostrando QR para conexión...");
-        if (callbackQR) callbackQR(base64Qr);
-      },
     })
     .then((cl) => {
       client = cl;
       estado = "Conectado";
-      log("✅ Sesión conectada");
+      logEstado("✅ Sesión conectada");
 
-      client.onStateChange((state) => {
-        log(`📶 Estado de conexión: ${state}`);
-        if (
-          state === "DISCONNECTED" ||
-          state === "UNPAIRED" ||
-          state === "UNPAIRED_IDLE"
-        ) {
-          log("⚠️ Sesión desconectada. Reiniciando...");
-          estado = "Desconectado";
+      // Conexión establecida
+      client.onStateChange((estadoConexion) => {
+        logEstado(`📶 Estado de conexión: ${estadoConexion}`);
+      });
+
+      // Escucha cambios de token para detectar cierre de sesión
+      client.onStreamChange((estado) => {
+        if (estado === "DISCONNECTED") {
+          logEstado("❌ Sesión desconectada desde el dispositivo móvil.");
           reiniciarSesion();
         }
       });
+
+      // Esperar confirmación visual antes de permitir enviar mensajes
+      mainWindow.webContents.send("sesion-iniciada");
     })
     .catch((err) => {
-      log("❌ Error al iniciar sesión: " + err.message);
-
-      // 🔄 Si es error de Puppeteer/Venom, borramos sesión y reintentamos
-      if (
-        err.message === undefined ||
-        err.message.includes("Failed to launch the browser")
-      ) {
-        log("🧹 Posible sesión bloqueada. Borrando carpeta y reintentando...");
-        eliminarSesionLocal();
-        setTimeout(() => iniciarWhatsApp(), 2000);
-      }
-
       estado = "Error";
+      logEstado("❌ Error al iniciar sesión: " + err.message);
     });
 }
 
 function reiniciarSesion() {
-  setTimeout(() => {
-    iniciarWhatsApp();
-  }, 3000);
-}
-
-function eliminarSesionLocal() {
-  const sessionPath = path.join(__dirname, "../session/bodas");
-  if (fs.existsSync(sessionPath)) {
-    fs.rmSync(sessionPath, { recursive: true, force: true });
-    log("🧹 Datos de sesión eliminados correctamente.");
-  } else {
-    log("ℹ️ No se encontraron datos de sesión anteriores.");
-  }
+  logEstado("♻️ Reintentando sesión desde cero...");
+  iniciarWhatsApp(mainWindow);
 }
 
 function estadoSesion() {
@@ -86,9 +62,21 @@ function onMensaje(callback) {
   callbackLog = callback;
 }
 
-function log(mensaje) {
-  console.log(mensaje);
-  if (callbackLog) callbackLog(mensaje);
+function logEstado(msg) {
+  console.log(msg);
+  if (callbackLog) callbackLog(msg);
+}
+
+function enviarMensaje(numero, mensaje) {
+  if (!client || estado !== "Conectado") {
+    logEstado("❌ No se puede enviar el mensaje: cliente no conectado.");
+    return;
+  }
+  const numeroFormateado = numero + "@c.us";
+  client
+    .sendText(numeroFormateado, mensaje)
+    .then(() => logEstado("✅ Mensaje enviado correctamente."))
+    .catch((err) => logEstado("❌ Error al enviar el mensaje: " + err.message));
 }
 
 module.exports = {
@@ -96,4 +84,5 @@ module.exports = {
   estadoSesion,
   onQRCode,
   onMensaje,
+  enviarMensaje,
 };

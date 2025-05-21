@@ -3,58 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <title>WhatsApp Desktop - Bodas</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 1rem;
-      }
-      #qr-container {
-        display: none;
-        margin: 1rem 0;
-      }
-      #qr {
-        width: 300px;
-        border: 1px solid #ccc;
-      }
-      pre {
-        background: #f9f9f9;
-        padding: 0.5rem;
-        border: 1px solid #ccc;
-        height: 200px;
-        overflow-y: auto;
-      }
-    </style>
   </head>
   <body>
     <h2>Estado de sesión</h2>
     <div id="estado">Cargando...</div>
 
-    <div id="qr-container">
-      <h2>QR de WhatsApp</h2>
-      <img id="qr" src="" />
-    </div>
+    <h2>QR de WhatsApp</h2>
+    <img id="qr" src="" width="300" />
 
     <h2>Log de eventos</h2>
     <pre id="log"></pre>
 
+    <div id="formulario-envio" style="display: none">
+      <h2>Enviar mensaje de prueba</h2>
+      <input type="text" id="telefono" placeholder="Ej: 34612345678" />
+      <button onclick="enviarMensaje()">Enviar mensaje</button>
+    </div>
+
     <script>
-      // Escucha el QR solo si lo recibe
+      let sesionActiva = false;
+
       window.electronAPI.onQR((qr) => {
-        const qrContainer = document.getElementById("qr-container");
-        const qrImg = document.getElementById("qr");
-        qrImg.src = qr;
-        qrContainer.style.display = "block";
+        document.getElementById("qr").src = qr;
       });
 
-      // Escucha logs
       window.electronAPI.onLog((msg) => {
         document.getElementById("log").textContent += msg + "\n";
+
+        if (msg.includes("✅ Sesión conectada")) {
+          sesionActiva = true;
+          document.getElementById("formulario-envio").style.display = "block";
+        }
       });
 
-      // Al cargar, pide el estado
       window.electronAPI.obtenerEstado().then((estado) => {
         document.getElementById("estado").textContent = estado;
       });
+
+      function enviarMensaje() {
+        const telefono = document.getElementById("telefono").value.trim();
+        if (!telefono || !sesionActiva) return;
+        window.electronAPI.enviarMensaje(telefono);
+      }
     </script>
   </body>
 </html>

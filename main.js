@@ -5,6 +5,7 @@ const {
   estadoSesion,
   onQRCode,
   onMensaje,
+  enviarMensajeAContacto,
 } = require("./services/whatsappService");
 
 let mainWindow;
@@ -27,6 +28,21 @@ app.whenReady().then(() => {
   iniciarWhatsApp();
 
   ipcMain.handle("estado-sesion", async () => estadoSesion());
+
+  ipcMain.on("enviar-mensaje", (event, telefono) => {
+    if (telefono) {
+      enviarMensajeAContacto(telefono)
+        .then(() =>
+          mainWindow.webContents.send("log", "✅ Mensaje enviado correctamente")
+        )
+        .catch((err) =>
+          mainWindow.webContents.send(
+            "log",
+            "❌ Error al enviar mensaje: " + err.message
+          )
+        );
+    }
+  });
 
   onQRCode((qrData) => {
     mainWindow.webContents.send("qr", qrData);
